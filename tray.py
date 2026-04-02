@@ -1,6 +1,6 @@
 """
 Two separate system-tray icons:
-  1. Tally light  – circle, 3 colours (dark gray / dark green / bright red)
+  1. Tally light  – film-leader style: dotted rings, black fill none/210°/full
   2. Mic status   – mic shape, green (live) or gray + red slash (muted)
 
 Left-click either icon  → toggle mute
@@ -18,12 +18,7 @@ from PIL import Image, ImageDraw
 _SIZE     = 64
 _ICON_DIR = tempfile.mkdtemp(prefix='ndi_tray_')
 
-# ── Tally colours ─────────────────────────────────────────────────────────────
-_TALLY_COLORS = {
-    'off':     (50,  50,  50),   # dark gray
-    'preview': (20, 120,  40),   # dark green
-    'program': (240, 20,  20),   # bright red
-}
+# ── Tally labels ──────────────────────────────────────────────────────────────
 _TALLY_LABELS = {
     'off':     'Standby',
     'preview': 'In Preview',
@@ -37,9 +32,43 @@ def _tally_icon(state: str) -> str:
     path = os.path.join(_ICON_DIR, f'tally_{state}.png')
     img  = Image.new('RGBA', (_SIZE, _SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    m    = 6
-    r, g, b = _TALLY_COLORS[state]
-    draw.ellipse([m, m, _SIZE - m, _SIZE - m], fill=(r, g, b, 255))
+
+    cx = cy  = _SIZE // 2
+    r_outer  = _SIZE // 2 - 3
+    r_inner  = _SIZE // 2 - 11
+    lw       = max(2, _SIZE // 22)
+    bbox_out = [cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer]
+
+    # Black background fill — none / 210° wedge / full circle
+    if state == 'program':
+        draw.ellipse(bbox_out, fill=(0, 0, 0, 255))
+    elif state == 'preview':
+        # 210° clockwise starting from top (-90° in PIL coords)
+        draw.pieslice(bbox_out, start=-90, end=120, fill=(0, 0, 0, 255))
+
+    # Dotted concentric circles: 16 short arcs per ring.
+    # Dot is white where it sits over the black fill, black elsewhere.
+    n_dots   = 16
+    dot_span = 8          # degrees each dot occupies
+    step     = 360 / n_dots
+
+    def _dot_color(a0):
+        if state == 'program':
+            return (255, 255, 255, 255)
+        if state == 'preview':
+            # Fill covers 270°–360° and 0°–120° (≡ start=-90, end=120 in PIL)
+            a = a0 % 360
+            if a >= 270 or a <= 120:
+                return (255, 255, 255, 255)
+        return (0, 0, 0, 255)
+
+    for r in (r_outer, r_inner):
+        bbox = [cx - r, cy - r, cx + r, cy + r]
+        for i in range(n_dots):
+            a0 = -90 + i * step
+            draw.arc(bbox, start=a0, end=a0 + dot_span,
+                     fill=_dot_color(a0), width=lw)
+
     img.save(path)
     return path
 
@@ -88,7 +117,7 @@ def _mic_icon(muted: bool) -> str:
 
 
 # Pre-generate all icons
-_TALLY_ICONS = {s: _tally_icon(s) for s in _TALLY_COLORS}
+_TALLY_ICONS = {s: _tally_icon(s) for s in _TALLY_LABELS}
 _MIC_ICONS   = {muted: _mic_icon(muted) for muted in (False, True)}
 
 
