@@ -1,0 +1,21 @@
+# NDI SDK (large binary SDK, install separately per INSTALL)
+NDI SDK for Linux/
+
+# GStreamer NDI plugin source + build tree (cloned separately per INSTALL)
+gst-plugins-rs/
+
+# Compiled NDI plugin and shared libraries
+lib/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Claude session logs
+claude_log*.txt
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.swo

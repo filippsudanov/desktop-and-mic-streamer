@@ -1,0 +1,91 @@
+NDI Desktop Streamer — Installation
+=====================================
+
+The app ships with NDI and GStreamer NDI plugin bundled in lib/:
+
+    lib/libndi.so.6.3.1   — NDI runtime (+ symlinks libndi.so.6, libndi.so)
+    lib/libgstndi.so      — GStreamer NDI plugin
+
+No system-wide NDI or GStreamer NDI install is needed.
+Always launch via run.sh, which sets GST_PLUGIN_PATH and LD_LIBRARY_PATH
+to point at lib/ before starting Python.
+
+
+1. System packages (Ubuntu/Debian)
+------------------------------------
+sudo apt install \
+    python3-gi \
+    python3-gi-cairo \
+    gir1.2-gtk-3.0 \
+    python3-gst-1.0 \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-x \
+    libgstreamer1.0-0
+
+# Wayland only (not needed for X11):
+sudo apt install \
+    gstreamer1.0-pipewire \
+    pipewire \
+    wireplumber \
+    xdg-desktop-portal \
+    xdg-desktop-portal-gtk   # or -gnome / -kde / -wlr depending on desktop
+
+
+2. Python packages
+------------------
+sudo apt install python3-pillow python3-numpy
+
+
+3. Run
+------
+./run.sh
+./run.sh --name "My Custom Source Name"
+
+The NDI source appears on the network as "Desktop Streamer" (or your chosen
+name).  Connect from OBS, vMix, Zoom, etc.
+
+Tray icons:
+  Left icon  — tally light:  dark gray=standby  dark green=preview  bright red=on-air
+  Right icon — mic status:   green=live          gray+slash=muted
+  Left-click either icon → toggle mic mute
+
+
+4. Firewall (ufw)
+------------------
+If ufw is active, open the ports NDI needs on the sending PC:
+
+    # mDNS discovery — may already be open if avahi-daemon is installed,
+    # but ufw can still block it if default policy is deny
+    sudo ufw allow 5353/udp comment 'NDI mDNS discovery'
+
+    # NDI video/audio data (covers up to ~10 simultaneous sources)
+    sudo ufw allow 5959:5969/tcp comment 'NDI stream data'
+    sudo ufw allow 5959:5969/udp comment 'NDI stream data'
+
+    # Additional ranges — only needed for more than ~10 concurrent NDI sources
+    sudo ufw allow 6960:6970/tcp comment 'NDI stream data (extra sources)'
+    sudo ufw allow 6960:6970/udp comment 'NDI stream data (extra sources)'
+    sudo ufw allow 7960:7970/tcp comment 'NDI stream data (extra sources)'
+    sudo ufw allow 7960:7970/udp comment 'NDI stream data (extra sources)'
+
+    # NDI Discovery Server — only if running a dedicated discovery server
+    sudo ufw allow 5960/tcp comment 'NDI Discovery Server'
+
+The receiving PC typically only needs outbound connections, which ufw allows
+by default.  mDNS (5353/udp) should be open on both ends for source discovery.
+
+
+5. Rebuilding lib/ from source
+--------------------------------
+See BUILD for step-by-step instructions to recompile libgstndi.so from
+gst-plugins-rs and re-copy libndi.so from the NDI SDK.
+
+
+6. Wayland
+----------
+On Wayland the app requests screen-capture permission via the XDG ScreenCast
+portal on first launch (a screen-picker dialog appears).  Make sure the
+portal is running:
+    systemctl --user status xdg-desktop-portal
