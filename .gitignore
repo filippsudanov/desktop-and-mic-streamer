@@ -5,7 +5,7 @@ NDI SDK for Linux/
 gst-plugins-rs/
 
 # Compiled NDI plugin and shared libraries
-lib/
+#lib/
 
 # Python cache
 __pycache__/

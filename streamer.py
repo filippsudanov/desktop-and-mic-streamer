@@ -14,6 +14,7 @@ from gi.repository import Gst, GLib
 
 import ctypes
 import os
+import sys
 import threading
 
 import numpy as np
@@ -78,7 +79,18 @@ class NDIStreamer:
 
         ret = self._pipeline.set_state(Gst.State.PLAYING)
         if ret == Gst.StateChangeReturn.FAILURE:
-            raise RuntimeError("GStreamer pipeline failed to start")
+            # Poll the bus briefly to get the actual error before tearing down.
+            msg = bus.timed_pop_filtered(
+                500 * Gst.MSECOND,
+                Gst.MessageType.ERROR,
+            )
+            detail = ''
+            if msg:
+                err, dbg = msg.parse_error()
+                detail = f': {err.message}'
+                if dbg:
+                    print(f'[GStreamer debug] {dbg}', file=sys.stderr)
+            raise RuntimeError(f"GStreamer pipeline failed to start{detail}")
 
         self._running = True
         self._tally_thread = threading.Thread(
@@ -107,9 +119,13 @@ class NDIStreamer:
         session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
 
         if session_type == 'wayland' and pw_fd is not None:
+            # videoconvert + explicit capsfilter normalises whatever raw format
+            # pipewiresrc negotiates (RGBA, BGRx, NV12, …) to BGRx so the
+            # downstream appsink always gets a known format.
             video_src = (
                 f'pipewiresrc fd={pw_fd} path={pw_node_id} '
-                f'do-timestamp=true'
+                f'do-timestamp=true ! '
+                f'videoconvert ! video/x-raw,format=BGRx'
             )
         else:
             display = os.environ.get('DISPLAY', ':0')

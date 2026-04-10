@@ -23,6 +23,26 @@ import os
 import signal
 import sys
 
+
+def _suppress_statusicon_warnings():
+    """
+    Gtk.StatusIcon is deprecated and not a GtkWidget, so on Wayland GTK
+    logs Gtk-CRITICAL 'gtk_widget_get_scale_factor: assertion GTK_IS_WIDGET
+    failed' every time it tries to query HiDPI scaling.  These are harmless
+    (the icon still appears via XEmbedded / StatusNotifierItem) but very
+    noisy, so we demote them to debug-level.
+    """
+    def _handler(domain, level, message, user_data):
+        if (domain == b'Gtk' and
+                b'gtk_widget_get_scale_factor' in message and
+                b'GTK_IS_WIDGET' in message):
+            return  # swallow
+        # Let everything else through to the default handler
+        GLib.log_default_handler(domain.decode() if domain else '', level, message.decode() if message else '', None)
+
+    # GLib.log_set_handler expects a Python callable; the domain must match.
+    GLib.log_set_handler('Gtk', GLib.LogLevelFlags.LEVEL_CRITICAL, _handler, None)
+
 from streamer import NDIStreamer
 from tray     import TrayIcon
 from portal   import ScreenCastPortal
@@ -110,6 +130,8 @@ def main():
     # Let Ctrl-C propagate to the default SIGINT handler so the process exits
     # cleanly instead of being swallowed by the GLib main loop.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    _suppress_statusicon_warnings()
 
     app = App(ndi_name=args.name)
     GLib.idle_add(app.launch)
